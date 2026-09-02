@@ -111,11 +111,15 @@ async function runLocalCores() {
     continueExecution();
   } else {
     exec(`${webPath} generate reality-keypair`, async (err, stdout) => {
-      if (err) return;
-      privateKey = (stdout.match(/PrivateKey:\s*(.*)/) || [])[1] || '';
-      publicKey = (stdout.match(/PublicKey:\s*(.*)/) || [])[1] || '';
-      fs.writeFileSync(keyFilePath, `PrivateKey: ${privateKey}\nPublicKey: ${publicKey}\n`, 'utf8');
-      continueExecution();
+      if (err) {
+        console.error(`[WARN] 密钥生成失败或不支持此命令，已跳过: ${err.message}`);
+      } else {
+        privateKey = (stdout.match(/PrivateKey:\s*(.*)/) || [])[1] || '';
+        publicKey = (stdout.match(/PublicKey:\s*(.*)/) || [])[1] || '';
+        fs.writeFileSync(keyFilePath, `PrivateKey: ${privateKey}\nPublicKey: ${publicKey}\n`, 'utf8');
+      }
+      // 无论成败，强制继续执行核心启动流程
+      continueExecution(); 
     });
   }
 
