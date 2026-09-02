@@ -267,7 +267,7 @@ async function generateLinks(argoDomain) {
 
 // 主进程启动
 async function startserver() {
-  execSync('pkill -f "web_core|bot_core" >/dev/null 2>&1 || true'); // 清理残留进程
+  // execSync('pkill -f "web_core|bot_core" >/dev/null 2>&1 || true'); // 清理残留进程
   argoType();
   await runLocalCores();
 }
