@@ -16,9 +16,9 @@ const AUTO_ACCESS = process.env.AUTO_ACCESS || false;
 const YT_WARPOUT = process.env.YT_WARPOUT || false;
 const FILE_PATH = process.env.FILE_PATH || '.npm';
 const SUB_PATH = process.env.SUB_PATH || 'sub';
-const UUID = process.env.UUID || '9afd1229-b893-40c1-84dd-51e7ce204913';
-const ARGO_DOMAIN = process.env.ARGO_DOMAIN || 'puratya.1791765.xyz';
-const ARGO_AUTH = process.env.ARGO_AUTH || 'eyJhIjoiZDY1NWNiOTk2NzNlZTYzMDE4NDFkMmQyNmYxNTY5N2EiLCJ0IjoiNDUxZjU1NjAtYzQwMi00MzExLWEyZDktOWE4MmI5MjU2YjI5IiwicyI6Ik5EaGlZekF3WmpBdE5qbGlaaTAwTjJaaExXSTROalV0WkRVNVlqaG1aRGN6WkRJNSJ9';
+const UUID = process.env.UUID || '14e709cd-142b-4e9f-b0a6-cf0e4c14da66';
+const ARGO_DOMAIN = process.env.ARGO_DOMAIN || '';
+const ARGO_AUTH = process.env.ARGO_AUTH || 'eyJhIjoiZDY1NWNiOTk2NzNlZTYzMDE4NDFkMmQyNmYxNTY5N2EiLCJ0IjoiMWNjMWIyNGItZGE2Mi00MjcxLWJjYzgtMzBlN2IwYjQ0ZGI3IiwicyI6Ik9UVTNNbUkyTWpjdFltRTJNeTAwWVRZMkxUZzVNMll0TWprNE1qWXpZMlkwWWpRMiJ8';
 const ARGO_PORT = process.env.ARGO_PORT || '59001';
 const S5_PORT = process.env.S5_PORT || '';
 const TUIC_PORT = process.env.TUIC_PORT || '';
@@ -26,12 +26,12 @@ const HY2_PORT = process.env.HY2_PORT || '';
 const ANYTLS_PORT = process.env.ANYTLS_PORT || '';
 const REALITY_PORT = process.env.REALITY_PORT || '';
 const ANYREALITY_PORT = process.env.ANYREALITY_PORT || '';
-const CFIP = process.env.CFIP || 'www.ntu.edu.sg';
+const CFIP = process.env.CFIP || 'saas.sin.fan';
 const CFPORT = process.env.CFPORT || 443;
 const PORT = process.env.PORT || 3000;
-const NAME = process.env.NAME || 'Purayta';
-const CHAT_ID = process.env.CHAT_ID || ''; // 留空，避免旧版 Discord Token 导致崩溃
-const BOT_TOKEN = process.env.BOT_TOKEN || ''; // 留空，避免旧版 Discord Token 导致崩溃
+const NAME = process.env.NAME || 'VM';
+const CHAT_ID = process.env.CHAT_ID || ''; 
+const BOT_TOKEN = process.env.BOT_TOKEN || ''; 
 const DISABLE_ARGO = process.env.DISABLE_ARGO || false;
 
 if (!fs.existsSync(FILE_PATH)) {
@@ -41,14 +41,12 @@ if (!fs.existsSync(FILE_PATH)) {
 let privateKey = '';
 let publicKey = '';
 
-// 固定文件路径，不再使用随机名
 let webPath = path.join(__dirname, 'web_core');
 let botPath = path.join(__dirname, 'bot_core');
 let subPath = path.join(FILE_PATH, 'sub.txt');
 let listPath = path.join(FILE_PATH, 'list.txt');
 let bootLogPath = path.join(FILE_PATH, 'boot.log');
 
-// 端口验证
 function isValidPort(port) {
   try {
     if (port === null || port === undefined || port === '') return false;
@@ -62,7 +60,6 @@ function isValidPort(port) {
   }
 }
 
-// 提取隧道配置
 function argoType() {
   if (DISABLE_ARGO === 'true' || DISABLE_ARGO === true) return;
   if (!ARGO_AUTH || !ARGO_DOMAIN) return;
@@ -85,9 +82,7 @@ function argoType() {
   }
 }
 
-// 赋予权限并启动本地核心
 async function runLocalCores() {
-  // 1. 强制赋予可执行权限
   const newPermissions = 0o775;
   [webPath, botPath].forEach(filePath => {
     if (fs.existsSync(filePath)) {
@@ -111,7 +106,7 @@ async function runLocalCores() {
     continueExecution();
   } else {
     exec(`${webPath} generate reality-keypair`, async (err, stdout) => {
-      if (err) return; // <--- 问题出在这里，报错后直接静默退出了
+      if (err) return; 
       privateKey = (stdout.match(/PrivateKey:\s*(.*)/) || [])[1] || '';
       publicKey = (stdout.match(/PublicKey:\s*(.*)/) || [])[1] || '';
       fs.writeFileSync(keyFilePath, `PrivateKey: ${privateKey}\nPublicKey: ${publicKey}\n`, 'utf8');
@@ -133,7 +128,7 @@ async function runLocalCores() {
         } catch (err) {}
       }
 
-      // 核心 Sing-box 配置
+      // 核心 Sing-box 配置（极简版，强制走平台代理）
       const config = {
         "log": { "disabled": true, "level": "error", "timestamp": true },
         "inbounds": [
@@ -150,36 +145,20 @@ async function runLocalCores() {
             }
           }
         ],
-        "endpoints": [
+        "outbounds": [
           {
-            "type": "wireguard",
-            "tag": "wireguard-out",
-            "mtu": 1280,
-            "address": ["172.16.0.2/32", "2606:4700:110:8dfe:d141:69bb:6b80:925/128"],
-            "private_key": "YFYOAdbw1bKTHlNNi+aEjBM3BO7unuFC5rOkMRAz9XY=",
-            "peers": [
-              {
-                "address": "engage.cloudflareclient.com",
-                "port": 2408,
-                "public_key": "bmXOC+F1FxEMF9dyiK2H5/1SUtzH0JuVo51h2wPfgyo=",
-                "allowed_ips": ["0.0.0.0/0", "::/0"],
-                "reserved": [78, 135, 76]
-              }
-            ]
+            "type": "socks",
+            "tag": "platform-proxy",
+            "server": "10.201.0.1",
+            "server_port": 40007
+          },
+          {
+            "type": "direct",
+            "tag": "direct"
           }
         ],
-        "outbounds": [
-          // 如果直连失败，可将 "direct" 替换为平台 SOCKS5: 
-          // { "type": "socks", "tag": "direct", "server": "10.201.0.1", "server_port": 40006 }
-          { "type": "direct", "tag": "direct" }
-        ],
         "route": {
-          "rule_set": [
-            { "tag": "netflix", "type": "remote", "format": "binary", "url": "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/sing/geo/geosite/netflix.srs", "download_detour": "direct" },
-            { "tag": "openai", "type": "remote", "format": "binary", "url": "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/sing/geo/geosite/openai.srs", "download_detour": "direct" }
-          ],
-          "rules": [{ "rule_set": ["netflix"], "outbound": "wireguard-out" }],
-          "final": "direct"
+          "final": "platform-proxy"
         }
       };
 
@@ -199,15 +178,16 @@ async function runLocalCores() {
         console.log('web_core is running');
       } catch (error) { console.error(`web running error: ${error}`); }
 
-      // 启动 Cloudflared 隧道
+      // 启动 Cloudflared 隧道 (强制注入 SOCKS5 代理环境变量)
       if (DISABLE_ARGO !== 'true' && DISABLE_ARGO !== true) {
         if (fs.existsSync(botPath)) {
           let args = ARGO_AUTH.match(/^[A-Z0-9a-z=]{120,250}$/) 
             ? `tunnel --edge-ip-version auto --no-autoupdate --protocol http2 run --token ${ARGO_AUTH}`
             : `tunnel --edge-ip-version auto --no-autoupdate --protocol http2 --logfile ${path.join(FILE_PATH, 'boot.log')} --loglevel info --url http://localhost:${ARGO_PORT}`;
           try {
-            await execPromise(`nohup ${botPath} ${args} >/dev/null 2>&1 &`);
-            console.log('bot_core is running');
+            const runCmd = `nohup env https_proxy="socks5://10.201.0.1:40007" all_proxy="socks5://10.201.0.1:40007" ${botPath} ${args} >/dev/null 2>&1 &`;
+            await execPromise(runCmd);
+            console.log('bot_core is running with SOCKS5 proxy');
           } catch (error) { console.error(`Error executing bot: ${error}`); }
         }
       }
@@ -224,7 +204,6 @@ function execPromise(command) {
   });
 }
 
-// 提取临时隧道并生成节点
 async function extractDomains() {
   if (DISABLE_ARGO === 'true' || DISABLE_ARGO === true) {
     await generateLinks(null);
@@ -246,7 +225,7 @@ async function extractDomains() {
 }
 
 async function generateLinks(argoDomain) {
-  let SERVER_IP = '127.0.0.1'; // 简化 IP 获取以防被平台拦截
+  let SERVER_IP = '127.0.0.1'; 
   const nodeName = NAME;
   let subTxt = '';
 
@@ -265,15 +244,12 @@ async function generateLinks(argoDomain) {
   fs.writeFileSync(listPath, subTxt, 'utf8');
 }
 
-// 主进程启动
 async function startserver() {
-  // execSync('pkill -f "web_core|bot_core" >/dev/null 2>&1 || true'); // 清理残留进程
   argoType();
   await runLocalCores();
 }
 startserver();
 
-// 简单的 Web 服务，用于通过平台的可用性检测
 const server = http.createServer((req, res) => {
   if (req.url === `/${SUB_PATH}`) {
     try {
