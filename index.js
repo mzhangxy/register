@@ -125,26 +125,6 @@ function deleteNodes() {
   }
 }
 
-// 清理历史文件
-function cleanupOldFiles() {
-  try {
-    const files = fs.readdirSync(FILE_PATH);
-    files.forEach(file => {
-      const filePath = path.join(FILE_PATH, file);
-      try {
-        const stat = fs.statSync(filePath);
-        if (stat.isFile()) {
-          fs.unlinkSync(filePath);
-        }
-      } catch (err) {
-        // 忽略所有错误，不记录日志
-      }
-    });
-  } catch (err) {
-    // 忽略所有错误，不记录日志
-  }
-}
-
 // crypto 生成 X25519 密钥对
 function generateX25519Keypair() {
   const { publicKey: pubKey, privateKey: privKey } = crypto.generateKeyPairSync('x25519');
@@ -354,7 +334,7 @@ function getSystemArchitecture() {
   }
 }
 
-// 下载对应系统架构的依赖文件
+// 下载对应系统架构的依赖文件 (支持 axios -> curl -> wget 降级)
 function downloadFile(fileName, fileUrl, callback) {
   const filePath = fileName;
 
@@ -362,34 +342,86 @@ function downloadFile(fileName, fileUrl, callback) {
     fs.mkdirSync(FILE_PATH, { recursive: true });
   }
 
-  const writer = fs.createWriteStream(filePath);
-
-  axios({
-    method: 'get',
-    url: fileUrl,
-    responseType: 'stream',
-  })
-    .then(response => {
-      response.data.pipe(writer);
-
-      writer.on('finish', () => {
-        writer.close();
-        console.log(`Download ${path.basename(filePath)} successfully`);
-        callback(null, filePath);
+  // 1. 封装原有的 axios 下载方式
+  const downloadWithAxios = () => {
+    return new Promise((resolve, reject) => {
+      const writer = fs.createWriteStream(filePath);
+      axios({
+        method: 'get',
+        url: fileUrl,
+        responseType: 'stream',
+        timeout: 15000 // 增加15秒超时防止一直挂起
+      }).then(response => {
+        response.data.pipe(writer);
+        writer.on('finish', () => {
+          writer.close();
+          resolve();
+        });
+        writer.on('error', err => {
+          writer.close();
+          fs.unlink(filePath, () => {});
+          reject(err);
+        });
+      }).catch(err => {
+        if (fs.existsSync(filePath)) fs.unlink(filePath, () => {});
+        reject(err);
       });
-
-      writer.on('error', err => {
-        fs.unlink(filePath, () => { });
-        const errorMessage = `Download ${path.basename(filePath)} failed: ${err.message}`;
-        console.error(errorMessage);
-        callback(errorMessage);
-      });
-    })
-    .catch(err => {
-      const errorMessage = `Download ${path.basename(filePath)} failed: ${err.message}`;
-      console.error(errorMessage);
-      callback(errorMessage);
     });
+  };
+
+  // 2. 封装 curl 下载方式
+  const downloadWithCurl = async () => {
+    // -L 跟随重定向, -s 静默模式, -m 15 限制最大运行15秒, -o 指定输出文件
+    await exec(`curl -L -s -m 15 -o "${filePath}" "${fileUrl}"`);
+    // 检查文件是否成功下载且不为空
+    if (!fs.existsSync(filePath) || fs.statSync(filePath).size === 0) {
+      throw new Error('Curl downloaded file is empty or missing');
+    }
+  };
+
+  // 3. 封装 wget 下载方式
+  const downloadWithWget = async () => {
+    // -q 静默模式, -T 15 超时15秒, -O 指定输出文件
+    await exec(`wget -q -T 15 -O "${filePath}" "${fileUrl}"`);
+    // 检查文件是否成功下载且不为空
+    if (!fs.existsSync(filePath) || fs.statSync(filePath).size === 0) {
+      throw new Error('Wget downloaded file is empty or missing');
+    }
+  };
+
+  // 核心执行逻辑：依次尝试
+  (async () => {
+    try {
+      await downloadWithAxios();
+      console.log(`Download ${path.basename(filePath)} successfully with axios`);
+      return callback(null, filePath);
+    } catch (axiosErr) {
+      console.error(`Axios download failed for ${path.basename(filePath)}, trying curl...`);
+      
+      try {
+        await downloadWithCurl();
+        console.log(`Download ${path.basename(filePath)} successfully with curl`);
+        return callback(null, filePath);
+      } catch (curlErr) {
+        console.error(`Curl download failed for ${path.basename(filePath)}, trying wget...`);
+        
+        try {
+          await downloadWithWget();
+          console.log(`Download ${path.basename(filePath)} successfully with wget`);
+          return callback(null, filePath);
+        } catch (wgetErr) {
+          const errorMessage = `All download methods (axios, curl, wget) failed for ${path.basename(filePath)}`;
+          console.error(errorMessage);
+          
+          // 如果全部失败，清理可能残留的空文件
+          if (fs.existsSync(filePath)) {
+            fs.unlinkSync(filePath);
+          }
+          return callback(errorMessage);
+        }
+      }
+    }
+  })();
 }
 
 // 下载并运行依赖文件
