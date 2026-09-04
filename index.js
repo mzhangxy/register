@@ -334,12 +334,29 @@ function getSystemArchitecture() {
   }
 }
 
-// 下载对应系统架构的依赖文件 (支持 axios -> curl -> wget 降级)
+// 下载对应系统架构的依赖文件 (文件存在则跳过，支持 axios -> curl -> wget 降级)
 function downloadFile(fileName, fileUrl, callback) {
   const filePath = fileName;
 
   if (!fs.existsSync(FILE_PATH)) {
     fs.mkdirSync(FILE_PATH, { recursive: true });
+  }
+
+  // 【新增逻辑】下载前检查文件是否存在
+  if (fs.existsSync(filePath)) {
+    try {
+      const stats = fs.statSync(filePath);
+      // 如果文件存在且大小大于0，认为已经下载过，直接跳过
+      if (stats.size > 0) {
+        console.log(`File ${path.basename(filePath)} already exists, skipping download.`);
+        return callback(null, filePath);
+      } else {
+        // 如果文件存在但大小为0（可能是上次下载失败的残留），则删除它准备重新下载
+        fs.unlinkSync(filePath);
+      }
+    } catch (err) {
+      console.error(`Error checking existing file ${filePath}:`, err.message);
+    }
   }
 
   // 1. 封装原有的 axios 下载方式
